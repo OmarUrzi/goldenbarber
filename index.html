@@ -65,9 +65,19 @@
             </button>
         </div>
 
+        <div class="mb-4">
+            <input type="text" id="search-input" placeholder="Buscar por nombre..." class="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+        </div>
+
         <div id="clients-container" class="space-y-4">
             <!-- Los datos de los clientes se renderizarán aquí -->
             <div class="text-center text-gray-500">Cargando datos...</div>
+        </div>
+
+        <div id="pagination-container" class="flex justify-center items-center space-x-4 mt-6">
+            <button id="prev-btn" class="px-4 py-2 bg-gray-200 text-gray-600 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">Anterior</button>
+            <span id="page-info" class="text-sm font-medium text-gray-700">Página 1 de 1</span>
+            <button id="next-btn" class="px-4 py-2 bg-gray-200 text-gray-600 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed">Siguiente</button>
         </div>
     </div>
 
@@ -78,12 +88,16 @@
             const clientsContainer = document.getElementById('clients-container');
             const barberTab = document.getElementById('tab-barber');
             const beautyTab = document.getElementById('tab-beauty');
+            const searchInput = document.getElementById('search-input');
+            const prevBtn = document.getElementById('prev-btn');
+            const nextBtn = document.getElementById('next-btn');
+            const pageInfo = document.getElementById('page-info');
+
             let allClients = [];
-
-            // Estado de la pestaña activa
             let activeTab = 'Barber';
+            let currentPage = 1;
+            const itemsPerPage = 50;
 
-            // Función para alternar la clase de la pestaña activa
             const setActiveTab = (tab) => {
                 activeTab = tab;
                 barberTab.classList.remove('border-green-500', 'text-green-600');
@@ -95,10 +109,8 @@
                 }
             };
             
-            // Asigna la pestaña inicial activa
             setActiveTab(activeTab);
 
-            // Función para obtener los datos
             const fetchData = async () => {
                 clientsContainer.innerHTML = '<div class="text-center text-gray-500">Cargando datos...</div>';
                 try {
@@ -107,69 +119,79 @@
                         throw new Error(`HTTP error! status: ${response.status}`);
                     }
                     allClients = await response.json();
-                    renderData(activeTab);
+                    renderData();
                 } catch (error) {
                     console.error("Error al obtener los datos:", error);
                     clientsContainer.innerHTML = '<div class="text-center text-red-500">Hubo un error al cargar los datos.</div>';
                 }
             };
 
-            // Función para renderizar los datos
-            const renderData = (source) => {
+            const renderData = () => {
                 clientsContainer.innerHTML = '';
-                const filteredClients = allClients.filter(client => client.data.Source === source);
+                const searchTerm = searchInput.value.toLowerCase();
+                
+                // 1. Filter by source and search term
+                const filteredClients = allClients.filter(client => {
+                    const matchesSource = client.data.Source === activeTab;
+                    const matchesSearch = client.data['Client Name'].toLowerCase().includes(searchTerm);
+                    return matchesSource && matchesSearch;
+                });
+                
+                // 2. Paginate the filtered results
+                const totalPages = Math.ceil(filteredClients.length / itemsPerPage);
+                const startIndex = (currentPage - 1) * itemsPerPage;
+                const paginatedClients = filteredClients.slice(startIndex, startIndex + itemsPerPage);
 
-                if (filteredClients.length === 0) {
-                    clientsContainer.innerHTML = `<div class="text-center text-gray-500">No hay clientes con la fuente '${source}'.</div>`;
-                    return;
+                if (paginatedClients.length === 0) {
+                    clientsContainer.innerHTML = `<div class="text-center text-gray-500">No hay clientes que coincidan con la búsqueda.</div>`;
+                } else {
+                    paginatedClients.forEach(client => {
+                        const date = new Date(client.data['Date Created']);
+                        const formattedDate = date.toLocaleDateString('es-ES', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                        });
+
+                        const isEnabled = client.data.Status === "Enabled";
+
+                        const clientCard = document.createElement('div');
+                        clientCard.className = 'bg-gray-50 p-4 rounded-lg shadow-sm flex items-center justify-between transition-transform duration-200 transform hover:scale-105';
+                        clientCard.innerHTML = `
+                            <div>
+                                <p class="text-gray-800 font-semibold">${client.data['Client Name']}</p>
+                                <p class="text-sm text-gray-500">Fuente: ${client.data.Source}</p>
+                                <p class="text-xs text-gray-400 mt-1">ID: ${client.data['Yelp ID']}</p>
+                                <p class="text-xs text-gray-400">Fecha: ${formattedDate}</p>
+                            </div>
+                            <div class="flex items-center">
+                                <span class="status-text text-sm mr-2 text-gray-600">${isEnabled ? 'Enabled' : 'Dissabled'}</span>
+                                <label class="toggle-container">
+                                    <input type="checkbox" class="toggle-input" data-key="${client.key}" ${isEnabled ? 'checked' : ''}>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                        `;
+                        clientsContainer.appendChild(clientCard);
+                    });
                 }
 
-                filteredClients.forEach(client => {
-                    const date = new Date(client.data['Date Created']);
-                    const formattedDate = date.toLocaleDateString('es-ES', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                    });
+                // 3. Update pagination controls
+                prevBtn.disabled = currentPage === 1;
+                nextBtn.disabled = currentPage === totalPages || paginatedClients.length === 0;
+                pageInfo.textContent = `Página ${totalPages === 0 ? 0 : currentPage} de ${totalPages}`;
 
-                    const isEnabled = client.data.Status === "Enabled";
-
-                    const clientCard = document.createElement('div');
-                    clientCard.className = 'bg-gray-50 p-4 rounded-lg shadow-sm flex items-center justify-between transition-transform duration-200 transform hover:scale-105';
-                    clientCard.innerHTML = `
-                        <div>
-                            <p class="text-gray-800 font-semibold">${client.data['Client Name']}</p>
-                            <p class="text-sm text-gray-500">Fuente: ${client.data.Source}</p>
-                            <p class="text-xs text-gray-400 mt-1">ID: ${client.data['Yelp ID']}</p>
-                            <p class="text-xs text-gray-400">Fecha: ${formattedDate}</p>
-                        </div>
-                        <div class="flex items-center">
-                            <span class="status-text text-sm mr-2 text-gray-600">${isEnabled ? 'Enabled' : 'Dissabled'}</span>
-                            <label class="toggle-container">
-                                <input type="checkbox" class="toggle-input" data-key="${client.key}" ${isEnabled ? 'checked' : ''}>
-                                <span class="toggle-slider"></span>
-                            </label>
-                        </div>
-                    `;
-
-                    clientsContainer.appendChild(clientCard);
-                });
-
-                // Añade listeners para los interruptores después de renderizar
+                // Add listeners for toggles
                 document.querySelectorAll('.toggle-input').forEach(toggle => {
                     toggle.addEventListener('change', (e) => {
                         const key = e.target.dataset.key;
                         const newStatus = e.target.checked ? 'Enabled' : 'Dissabled';
-                        
-                        // Guarda el elemento del texto de estado para actualizarlo
                         const statusElement = e.target.closest('.flex.items-center').querySelector('.status-text');
-                        
                         updateStatus(key, newStatus, statusElement, e.target);
                     });
                 });
             };
 
-            // Función para actualizar el estado a través del webhook
             const updateStatus = async (key, status, statusElement, toggleInput) => {
                 try {
                     const response = await fetch(updateEndpoint, {
@@ -184,35 +206,53 @@
                         throw new Error(`HTTP error! status: ${response.status}`);
                     }
                     console.log('Estatus actualizado con éxito:', { key, status });
-
-                    // Actualiza el texto en el frontend
                     statusElement.textContent = status;
-
-                    // Actualiza el array allClients para mantener los datos sincronizados
                     const client = allClients.find(c => c.key === key);
                     if (client) {
                         client.data.Status = status;
                     }
-
                 } catch (error) {
                     console.error("Error al actualizar el estatus:", error);
-                    // Si falla, revierte el estado del toggle
                     toggleInput.checked = (status === 'Dissabled');
                 }
             };
 
-            // Event listeners para las pestañas
+            // Event listeners
             barberTab.addEventListener('click', () => {
                 setActiveTab('Barber');
-                renderData('Barber');
+                searchInput.value = '';
+                currentPage = 1;
+                renderData();
             });
 
             beautyTab.addEventListener('click', () => {
                 setActiveTab('Beauty');
-                renderData('Beauty');
+                searchInput.value = '';
+                currentPage = 1;
+                renderData();
             });
 
-            // Cargar los datos al iniciar la página
+            searchInput.addEventListener('input', () => {
+                currentPage = 1;
+                renderData();
+            });
+
+            prevBtn.addEventListener('click', () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    renderData();
+                }
+            });
+
+            nextBtn.addEventListener('click', () => {
+                const filteredClients = allClients.filter(client => client.data.Source === activeTab);
+                const totalPages = Math.ceil(filteredClients.length / itemsPerPage);
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    renderData();
+                }
+            });
+
             fetchData();
         });
     </script>
