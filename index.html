@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestor de Clientes</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .toggle-container {
+            position: relative;
+            display: inline-block;
+            width: 48px;
+            height: 28px;
+        }
+        .toggle-input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 28px;
+        }
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        .toggle-input:checked + .toggle-slider {
+            background-color: #10B981;
+        }
+        .toggle-input:checked + .toggle-slider:before {
+            transform: translateX(20px);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+
+    <div class="bg-white rounded-xl shadow-lg p-6 w-full max-w-2xl">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">Gestor de Clientes</h1>
+
+        <div class="flex border-b border-gray-200 mb-6">
+            <button id="tab-barber" class="flex-1 py-3 px-4 text-center text-lg font-medium text-gray-600 hover:text-green-600 focus:outline-none transition-colors duration-200 border-b-2 border-transparent">
+                Barber
+            </button>
+            <button id="tab-beauty" class="flex-1 py-3 px-4 text-center text-lg font-medium text-gray-600 hover:text-green-600 focus:outline-none transition-colors duration-200 border-b-2 border-transparent">
+                Beauty
+            </button>
+        </div>
+
+        <div id="clients-container" class="space-y-4">
+            <!-- Los datos de los clientes se renderizarán aquí -->
+            <div class="text-center text-gray-500">Cargando datos...</div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const dataEndpoint = "https://hook.us2.make.com/figa69mb0et2c7oq6xh0eytccvno3kc6";
+            const updateEndpoint = "https://hook.us2.make.com/n1vvxjdfuw9dvw8lpidcxylefrsawdy6";
+            const clientsContainer = document.getElementById('clients-container');
+            const barberTab = document.getElementById('tab-barber');
+            const beautyTab = document.getElementById('tab-beauty');
+            let allClients = [];
+
+            // Estado de la pestaña activa
+            let activeTab = 'Barber';
+
+            // Función para alternar la clase de la pestaña activa
+            const setActiveTab = (tab) => {
+                activeTab = tab;
+                barberTab.classList.remove('border-green-500', 'text-green-600');
+                beautyTab.classList.remove('border-green-500', 'text-green-600');
+                if (tab === 'Barber') {
+                    barberTab.classList.add('border-green-500', 'text-green-600');
+                } else {
+                    beautyTab.classList.add('border-green-500', 'text-green-600');
+                }
+            };
+            
+            // Asigna la pestaña inicial activa
+            setActiveTab(activeTab);
+
+            // Función para obtener los datos
+            const fetchData = async () => {
+                clientsContainer.innerHTML = '<div class="text-center text-gray-500">Cargando datos...</div>';
+                try {
+                    const response = await fetch(dataEndpoint);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    allClients = await response.json();
+                    renderData(activeTab);
+                } catch (error) {
+                    console.error("Error al obtener los datos:", error);
+                    clientsContainer.innerHTML = '<div class="text-center text-red-500">Hubo un error al cargar los datos.</div>';
+                }
+            };
+
+            // Función para renderizar los datos
+            const renderData = (source) => {
+                clientsContainer.innerHTML = '';
+                const filteredClients = allClients.filter(client => client.data.Source === source);
+
+                if (filteredClients.length === 0) {
+                    clientsContainer.innerHTML = `<div class="text-center text-gray-500">No hay clientes con la fuente '${source}'.</div>`;
+                    return;
+                }
+
+                filteredClients.forEach(client => {
+                    const date = new Date(client.data['Date Created']);
+                    const formattedDate = date.toLocaleDateString('es-ES', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    });
+
+                    const isEnabled = client.data.Status === "Enabled";
+
+                    const clientCard = document.createElement('div');
+                    clientCard.className = 'bg-gray-50 p-4 rounded-lg shadow-sm flex items-center justify-between transition-transform duration-200 transform hover:scale-105';
+                    clientCard.innerHTML = `
+                        <div>
+                            <p class="text-gray-800 font-semibold">${client.data['Client Name']}</p>
+                            <p class="text-sm text-gray-500">Fuente: ${client.data.Source}</p>
+                            <p class="text-xs text-gray-400 mt-1">ID: ${client.data['Yelp ID']}</p>
+                            <p class="text-xs text-gray-400">Fecha: ${formattedDate}</p>
+                        </div>
+                        <div class="flex items-center">
+                            <span class="status-text text-sm mr-2 text-gray-600">${isEnabled ? 'Enabled' : 'Dissabled'}</span>
+                            <label class="toggle-container">
+                                <input type="checkbox" class="toggle-input" data-key="${client.key}" ${isEnabled ? 'checked' : ''}>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    `;
+
+                    clientsContainer.appendChild(clientCard);
+                });
+
+                // Añade listeners para los interruptores después de renderizar
+                document.querySelectorAll('.toggle-input').forEach(toggle => {
+                    toggle.addEventListener('change', (e) => {
+                        const key = e.target.dataset.key;
+                        const newStatus = e.target.checked ? 'Enabled' : 'Dissabled';
+                        
+                        // Guarda el elemento del texto de estado para actualizarlo
+                        const statusElement = e.target.closest('.flex.items-center').querySelector('.status-text');
+                        
+                        updateStatus(key, newStatus, statusElement, e.target);
+                    });
+                });
+            };
+
+            // Función para actualizar el estado a través del webhook
+            const updateStatus = async (key, status, statusElement, toggleInput) => {
+                try {
+                    const response = await fetch(updateEndpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ key: key, status: status }),
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    console.log('Estatus actualizado con éxito:', { key, status });
+
+                    // Actualiza el texto en el frontend
+                    statusElement.textContent = status;
+
+                    // Actualiza el array allClients para mantener los datos sincronizados
+                    const client = allClients.find(c => c.key === key);
+                    if (client) {
+                        client.data.Status = status;
+                    }
+
+                } catch (error) {
+                    console.error("Error al actualizar el estatus:", error);
+                    // Si falla, revierte el estado del toggle
+                    toggleInput.checked = (status === 'Dissabled');
+                }
+            };
+
+            // Event listeners para las pestañas
+            barberTab.addEventListener('click', () => {
+                setActiveTab('Barber');
+                renderData('Barber');
+            });
+
+            beautyTab.addEventListener('click', () => {
+                setActiveTab('Beauty');
+                renderData('Beauty');
+            });
+
+            // Cargar los datos al iniciar la página
+            fetchData();
+        });
+    </script>
+</body>
+</html>
