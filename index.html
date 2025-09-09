@@ -160,9 +160,7 @@
                         clientCard.innerHTML = `
                             <div>
                                 <p class="text-gray-800 font-semibold">${client.data['Client Name']}</p>
-                                <p class="text-sm text-gray-500">Fuente: ${client.data.Source}</p>
-                                <p class="text-xs text-gray-400 mt-1">ID: ${client.data['Yelp ID']}</p>
-                                <p class="text-xs text-gray-400">Fecha: ${formattedDate}</p>
+                                <p class="text-xs text-gray-400">Fecha de creación: ${formattedDate}</p>
                             </div>
                             <div class="flex items-center">
                                 <span class="status-text text-sm mr-2 text-gray-600">${isEnabled ? 'Enabled' : 'Dissabled'}</span>
